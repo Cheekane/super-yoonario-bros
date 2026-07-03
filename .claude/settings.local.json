@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -m venv .venv)",
+      "Bash(.venv/bin/pip install *)",
+      "Bash(.venv/bin/python -c \"import pygame; print\\(pygame.ver\\)\")",
+      "Bash(.venv/bin/python tests/smoke_test.py)",
+      "Bash(.venv/bin/python tests/screenshots.py)",
+      "Bash(.venv/bin/python -)",
+      "Bash(.venv/bin/python -m py_compile game/*.py main.py)"
+    ]
+  }
+}
