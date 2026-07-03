@@ -6,6 +6,7 @@ join without anyone touching router settings or installing anything.
 """
 import re
 import socket
+import sys
 import threading
 import time
 import urllib.request
@@ -223,9 +224,15 @@ class AutoPortForward:
     def _run(self):
         try:
             self._gateway = Gateway.find()
+            if self._gateway is None:                # transient? try once more
+                self._gateway = Gateway.find(timeout=4.0)
             if self._gateway is None:
                 self.status = "failed"
-                self.message = "router doesn't answer UPnP"
+                if sys.platform == "darwin":
+                    # most common cause on macOS: Local Network permission
+                    self.message = "allow Local Network in System Settings"
+                else:
+                    self.message = "router doesn't answer UPnP"
                 return
             self._gateway.add_mapping(self.port)
             try:

@@ -34,6 +34,12 @@ jobs:
       - run: >
           pyinstaller --windowed --name "Super Yoonario Bros"
           --icon assets/yoonario.icns main.py
+      - name: Declare Local Network usage (macOS privacy prompt)
+        run: |
+          plutil -replace NSLocalNetworkUsageDescription \
+            -string "Finds your router to set up online multiplayer hosting and lets friends on your wifi join your game." \
+            "dist/Super Yoonario Bros.app/Contents/Info.plist"
+          codesign --force --deep -s - "dist/Super Yoonario Bros.app"
       - name: Zip app bundle
         run: |
           cd dist

@@ -316,6 +316,12 @@ class HostLobbyScene(Scene):
                     self.app.switch(GameScene(self.app, "host", self.level,
                                               host=self.host))
                     return
+                elif e.key == pygame.K_r and self.host.upnp \
+                        and self.host.upnp.status == "failed":
+                    self.host.upnp.stop()
+                    self.host.upnp = None
+                    self.host.start_port_forward()
+                    self.app.audio.play("select")
         for pid, msg in self.host.poll():
             if msg.get("t") == "char":
                 addr = self.host.by_pid.get(pid)
@@ -345,7 +351,7 @@ class HostLobbyScene(Scene):
             text(surf, f"Internet: {up.external_ip}:{self.host.port}",
                  VIEW_W // 2, 37, (160, 255, 160), 8, center=True)
         else:
-            text(surf, f"Internet: auto-setup failed ({up.message})",
+            text(surf, f"Internet: {up.message} - R to retry",
                  VIEW_W // 2, 37, (255, 190, 120), 7, center=True)
         draw_player_slots(surf, self.app, self.lobby_players())
         lv = LEVELS[self.level]
