@@ -41,11 +41,14 @@ python3 -m venv .venv
 One player hosts, up to three join. Everyone picks a character in the lobby;
 the host picks the level and starts.
 
-- **Same wifi/LAN:** the host's screen shows their address (e.g.
-  `192.168.1.23:26501`); the others enter it on the Join screen.
-- **Over the internet:** either the host forwards UDP port `26501` on their
-  router and shares their public IP, or (much easier) everyone installs
-  [Tailscale](https://tailscale.com) and the joiners use the host's Tailscale IP.
+The host's lobby screen shows two addresses:
+
+- **Same wifi:** friends on the same network type the wifi address.
+- **Internet:** the game automatically forwards the port on the host's router
+  (UPnP) and shows the public address — friends anywhere type that one. The
+  mapping is removed when you stop hosting. If the router has UPnP disabled
+  or the ISP uses CGNAT, the lobby says so; fall back to forwarding UDP
+  `26501` manually or using [Tailscale](https://tailscale.com).
 
 If someone dies they respawn after a couple of seconds next to a living
 teammate. The level is cleared when *any* player reaches the flag (or defeats

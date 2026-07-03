@@ -279,6 +279,8 @@ class HostLobbyScene(Scene):
         self.level = min(app.save["unlocked"], len(LEVELS)) - 1
         self.ip = net.local_ip()
         self._last_bcast = 0.0
+        if self.host:
+            self.host.start_port_forward()
         app.audio.play_music("menu")
 
     def lobby_players(self):
@@ -332,9 +334,19 @@ class HostLobbyScene(Scene):
             text(surf, "press any key", VIEW_W // 2, 130, (255, 255, 255), 8,
                  center=True)
             return
-        text(surf, "HOSTING GAME", VIEW_W // 2, 12, (255, 255, 255), 12, center=True)
-        text(surf, f"Your address: {self.ip}:{self.host.port}", VIEW_W // 2, 30,
-             (160, 255, 160), 9, center=True)
+        text(surf, "HOSTING GAME", VIEW_W // 2, 10, (255, 255, 255), 12, center=True)
+        text(surf, f"Same wifi: {self.ip}:{self.host.port}", VIEW_W // 2, 26,
+             (160, 255, 160), 8, center=True)
+        up = self.host.upnp
+        if up is None or up.status == "working":
+            text(surf, "Internet: checking your router...", VIEW_W // 2, 37,
+                 (200, 200, 220), 8, center=True)
+        elif up.status == "ok":
+            text(surf, f"Internet: {up.external_ip}:{self.host.port}",
+                 VIEW_W // 2, 37, (160, 255, 160), 8, center=True)
+        else:
+            text(surf, f"Internet: auto-setup failed ({up.message})",
+                 VIEW_W // 2, 37, (255, 190, 120), 7, center=True)
         draw_player_slots(surf, self.app, self.lobby_players())
         lv = LEVELS[self.level]
         text(surf, f"Level: {lv['world']}-{lv['index']} {lv['name']}",

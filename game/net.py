@@ -52,6 +52,13 @@ class Host:
         self.peers = {}                     # addr -> peer dict
         self.by_pid = {}                    # pid -> addr
         self.next_pid = 1
+        self.upnp = None                    # AutoPortForward, when hosting
+
+    def start_port_forward(self):
+        """Kick off automatic router port forwarding (idempotent)."""
+        if self.upnp is None:
+            from .upnp import AutoPortForward
+            self.upnp = AutoPortForward(self.port)
 
     def poll(self):
         """Returns list of (pid, msg). Handles join/ping/leave internally."""
@@ -127,6 +134,8 @@ class Host:
         return [0] + sorted(self.by_pid)
 
     def close(self):
+        if self.upnp:
+            self.upnp.stop()
         self.send_all({"t": "end"})
         self.sock.close()
 

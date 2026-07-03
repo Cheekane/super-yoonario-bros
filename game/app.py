@@ -291,10 +291,9 @@ class App:
         self.save["sfx_volume"] = self.audio.sfx_volume
         self.save["music_volume"] = self.audio.music_volume
         self.save.write()
-        scene = self.scene
-        if isinstance(scene, GameScene):
-            if scene.host:
-                scene.host.close()
-            if scene.client:
-                scene.client.close()
+        # close any live network objects regardless of which scene we're in
+        for attr in ("host", "client"):
+            obj = getattr(self.scene, attr, None)
+            if obj:
+                obj.close()
         pygame.quit()

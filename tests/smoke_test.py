@@ -126,7 +126,29 @@ if hw.enemies:
 client.close()
 host.close()
 
-# 6. Snapshot size sanity (single UDP datagram, ideally < MTU)
+# 6. UPnP parsing (offline: fixture XML, no real router involved)
+from game import upnp
+
+FIXTURE = """<?xml version="1.0"?>
+<root xmlns="urn:schemas-upnp-org:device-1-0">
+ <device><deviceList><device><serviceList>
+  <service>
+   <serviceType>urn:schemas-upnp-org:service:WANIPConnection:1</serviceType>
+   <controlURL>/ctl/IPConn</controlURL>
+  </service>
+ </serviceList></device></deviceList></device>
+</root>"""
+stype, ctl = upnp.parse_control_url(FIXTURE, "http://192.168.1.1:5000/desc.xml")
+check("upnp parse control url",
+      stype == "urn:schemas-upnp-org:service:WANIPConnection:1"
+      and ctl == "http://192.168.1.1:5000/ctl/IPConn", ctl or "")
+body = upnp.soap_body(stype, "AddPortMapping",
+                      [("NewExternalPort", 26501), ("NewProtocol", "UDP")])
+check("upnp soap body",
+      "<NewExternalPort>26501</NewExternalPort>" in body
+      and 'xmlns:u="urn:schemas-upnp-org:service:WANIPConnection:1"' in body)
+
+# 7. Snapshot size sanity (single UDP datagram, ideally < MTU)
 big = net.encode(snap)
 check("snapshot size", len(big) < 1400, f"{len(big)} bytes")
 

@@ -16,10 +16,12 @@
 One player hosts (Host Multiplayer) and tells the others the address shown on
 their screen; the rest pick Join Multiplayer and type it in.
 
-- **Same wifi:** just use the address on the host's screen.
-- **Different homes:** easiest is [Tailscale](https://tailscale.com) (free) on
-  everyone's computer — the host shares their Tailscale IP. Otherwise the host
-  must forward UDP port 26501 on their router.
+- **Same wifi:** use the "Same wifi" address on the host's screen.
+- **Different homes:** use the "Internet" address — the game sets up the
+  router port forwarding automatically (UPnP) while you host. If the lobby
+  says auto-setup failed (UPnP off, or CGNAT internet), the host can forward
+  UDP port 26501 manually or everyone can use
+  [Tailscale](https://tailscale.com).
 - Allow the app through the firewall if your OS asks (needed for hosting).
 
 ## Controls
