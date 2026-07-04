@@ -4,27 +4,20 @@ import pygame
 from .constants import VIEW_W, VIEW_H, CHARACTERS
 from .sprites import CHAR_COLORS
 
-_fonts = {}
+from . import font as pixfont
 
 
-def font(size=8):
-    if size not in _fonts:
-        _fonts[size] = pygame.font.Font(None, size + 4)
-    return _fonts[size]
+def _scale(size):
+    """Map legacy point-ish sizes onto integer pixel-font scales."""
+    if size <= 9:
+        return 1
+    if size <= 15:
+        return 2
+    return 3
 
 
 def text(surf, s, x, y, color=(255, 255, 255), size=8, center=False, shadow=True):
-    img = font(size).render(s, False, color)
-    r = img.get_rect()
-    if center:
-        r.midtop = (x, y)
-    else:
-        r.topleft = (x, y)
-    if shadow:
-        sh = font(size).render(s, False, (0, 0, 0))
-        surf.blit(sh, (r.x + 1, r.y + 1))
-    surf.blit(img, r)
-    return r
+    return pixfont.draw(surf, s, x, y, color, _scale(size), center, shadow)
 
 
 def tiny_text(surf, s, x, y, color):

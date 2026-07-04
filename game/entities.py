@@ -85,6 +85,18 @@ def move_collide(ent, level, dt, oneway=True, platforms=()):
                 ent.vy = 0
                 res["on_ground"] = True
                 res["on_platform"] = p
+    # ground probe: sub-pixel gravity oscillation must not flicker on_ground
+    # (feet hover <1px above the floor on alternate frames otherwise)
+    if not res["on_ground"] and ent.vy >= 0:
+        probe = ent.rect.move(0, 1)
+        if level.rect_hits(probe, lambda c: c in level_solid()):
+            res["on_ground"] = True
+        elif oneway:
+            bottom = ent.rect.bottom
+            for tx, ty, c in level.rect_hits(probe, lambda c: c == "-"):
+                if bottom <= ty * TILE + 4:
+                    res["on_ground"] = True
+                    break
     return res
 
 
