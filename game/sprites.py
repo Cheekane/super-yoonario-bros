@@ -359,6 +359,53 @@ BOSS = [
     "..GGGG..GGGG...GGGG...",
 ]
 
+HOPPER_1 = [
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "...GG......GG...",
+    "..GWKG....GKWG..",
+    "..GGGG....GGGG..",
+    "...GGGGGGGGGG...",
+    "..GGGGGGGGGGGG..",
+    ".GGDDGGGGGGDDGG.",
+    ".GDDGGGGGGGGDDG.",
+    ".GGDDDGGGGDDDGG.",
+    "..GGDDG..GDDGG..",
+    "................",
+]
+HOPPER_2 = [
+    "................",
+    "................",
+    "...GG......GG...",
+    "..GWKG....GKWG..",
+    "..GGGG....GGGG..",
+    "...GGGGGGGGGG...",
+    "..GGGGGGGGGGGG..",
+    ".GGGGGGGGGGGGGG.",
+    ".GDDGGGGGGGGDDG.",
+    ".GDDGGGGGGGGDDG.",
+    "..GDD......DDG..",
+    "..GDD......DDG..",
+    "..DDD......DDD..",
+    "................",
+    "................",
+    "................",
+]
+
+CANNONBALL = [
+    "...KKKK...",
+    ".KKKKKKKK.",
+    "KKWWKKKKKK",
+    "KKWWKKKKKK",
+    "KKKKKKKKKK",
+    ".KKKKKKKK.",
+    "...KKKK...",
+]
+
 ENEMY_PAL = {
     "B": (172, 108, 40), "C": (228, 176, 112), "K": BLACK, "W": WHITE,
     "G": (0, 168, 68), "S": (248, 216, 120), "Y": (252, 224, 88),
@@ -453,6 +500,8 @@ class Sprites:
         self.flit = [build(FLIT_1, ep), build(FLIT_2, ep)]
         self.plant = [build(PLANT_OPEN, ep), build(PLANT_CLOSED, ep)]
         self.boss = build(BOSS, ep)
+        self.hopper = [build(HOPPER_1, ep), build(HOPPER_2, ep)]
+        self.cannonball = build(CANNONBALL, ep)
         self.coin = [build(g, ip) for g in COIN_FRAMES_SRC]
         self.coin.append(pygame.transform.flip(self.coin[1], True, False))
         self.mushroom = build(MUSHROOM, ip)
@@ -481,6 +530,8 @@ class Sprites:
         t["flag"] = self._flag()
         t["checkpoint"] = self._checkpoint()
         t["bridge"] = self._bridge()
+        t["turret"] = self._turret()
+        t["spring"] = self._spring()
         return t
 
     @staticmethod
@@ -626,6 +677,28 @@ class Sprites:
         for x in range(0, TILE, 4):
             pygame.draw.line(s, self._dark(c, 0.55), (x, 0), (x, 5))
         pygame.draw.rect(s, self._light(c), (0, 0, TILE, 1))
+        return s
+
+    def _turret(self):
+        s = pygame.Surface((TILE, TILE))
+        body = (88, 88, 100)
+        s.fill(body)
+        pygame.draw.rect(s, self._light(body), (0, 0, TILE, 2))
+        pygame.draw.rect(s, self._dark(body, 0.5), (0, TILE - 2, TILE, 2))
+        pygame.draw.circle(s, (40, 40, 48), (8, 8), 5)
+        pygame.draw.circle(s, (16, 16, 16), (8, 8), 3)
+        for x, y in ((2, 2), (2, 13), (13, 2), (13, 13)):
+            s.set_at((x, y), (30, 30, 36))
+        return s
+
+    def _spring(self):
+        s = pygame.Surface((TILE, TILE), pygame.SRCALPHA)
+        red = (216, 40, 0)
+        pygame.draw.rect(s, red, (2, 2, 12, 3))
+        pygame.draw.rect(s, self._light(red), (2, 2, 12, 1))
+        for y in (7, 10, 13):
+            pygame.draw.line(s, (200, 200, 208), (4, y), (11, y - 2))
+        pygame.draw.rect(s, (120, 120, 128), (2, 14, 12, 2))
         return s
 
     def _spike_ball(self):

@@ -51,6 +51,16 @@ PLANT_PERIOD = 3.2                 # seconds per emerge cycle
 FIREBALL_SPEED = 210.0
 FIREBALL_BOUNCE = -160.0
 BOSS_HP = 3
+HOPPER_JUMP = -290.0               # frog enemy hop velocity
+HOPPER_SPEED = 70.0                # horizontal speed while hopping
+HOPPER_WAIT = 0.9                  # pause between hops
+DOZER_SPEED = 42.0                 # smart walker (turns at ledges)
+CANNON_SPEED = 55.0                # cannonball flight speed
+CANNON_COOLDOWN = 3.0              # seconds between shots
+CANNON_RANGE = 200.0               # fires when a player is this close
+FIREBAR_SPEED = 1.7                # radians/sec
+FIREBAR_FLAMES = 4                 # flames per bar (8px apart)
+SPRING_VEL = -520.0                # springboard launch velocity
 
 # --- Scoring ---
 SCORE_COIN = 100
@@ -74,4 +84,4 @@ PSTATE_RATE = 30                   # client player-state send Hz
 INTERP_DELAY = 0.1                 # seconds of interpolation buffer
 NET_TIMEOUT = 6.0                  # drop peer after silence
 MAX_PLAYERS = 4
-PROTOCOL_VERSION = 2
+PROTOCOL_VERSION = 3

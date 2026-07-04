@@ -4,7 +4,7 @@ import pygame
 from .constants import TILE, VIEW_W, VIEW_H
 from . import levels as leveldata
 
-SOLID = set("XB?MU=[]{}b#")
+SOLID = set("XB?MU=[]{}b#TJ")
 ONEWAY = "-"
 HAZARD_SPIKE = "^"
 HAZARD_LAVA = "L"
@@ -31,6 +31,8 @@ class Level:
         self.platform_spawns = []           # (axis, tx, ty)
         self.checkpoints = []               # (tx, ty) sorted by x
         self.flag = None                    # (tx, ty_top, ty_bottom)
+        self.turrets = []                   # (tx, ty) cannon blocks
+        self.firebars = []                  # (tx, ty) rotating fire pivots
         self.boss_spawn = None
         self._extract()
         self.pixel_w = self.w * TILE
@@ -46,9 +48,16 @@ class Level:
                 if c == "P":
                     self.spawn = (tx * TILE, ty * TILE)
                     g[ty][tx] = EMPTY
-                elif c in "EKSW":
+                elif c in "EKSWHD":
                     self.enemy_spawns.append(({"E": "grub", "K": "shell",
-                                               "S": "spiny", "W": "flit"}[c], tx, ty))
+                                               "S": "spiny", "W": "flit",
+                                               "H": "hopper", "D": "dozer"}[c],
+                                              tx, ty))
+                    g[ty][tx] = EMPTY
+                elif c == "T":
+                    self.turrets.append((tx, ty))
+                elif c == "R":
+                    self.firebars.append((tx, ty))
                     g[ty][tx] = EMPTY
                 elif c == "C":
                     self.coin_spawns.append((tx, ty))
@@ -166,6 +175,10 @@ class Level:
                     surf.blit(lava, (px, py))
                 elif c == "b":
                     surf.blit(tiles["bridge"], (px, py))
+                elif c == "T":
+                    surf.blit(tiles["turret"], (px, py))
+                elif c == "J":
+                    surf.blit(tiles["spring"], (px, py))
         # flag pole
         if self.flag:
             tx, ty_top, ty_bot = self.flag

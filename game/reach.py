@@ -96,6 +96,8 @@ class Reach:
             return self._headroom(x, y, 2 if adx <= 4 else 3)
         return True                         # plain walking / stepping down
 
+    SPRING_UP = 5       # tiles of lift from a springboard (without holding jump)
+
     def _bfs(self):
         start = self._spawn_tile()
         seen = {start}
@@ -103,12 +105,18 @@ class Reach:
         standing = self.standing
         while q:
             x, y = q.popleft()
+            spring = self.level.tile(x, y + 1) == "J"
+            max_up = self.SPRING_UP if spring else MAX_UP
             for dx in range(-MAX_DX, MAX_DX + 1):
-                for dy in range(-MAX_UP, self.level.h):
+                for dy in range(-max_up, self.level.h):
                     t = (x + dx, y + dy)
                     if t in seen or t not in standing:
                         continue
-                    if self._move_ok(x, y, dx, dy):
+                    if spring and dy < -MAX_UP:
+                        ok = abs(dx) <= 4 and self._headroom(x, y, -dy + 1)
+                    else:
+                        ok = self._move_ok(x, y, dx, dy)
+                    if ok:
                         seen.add(t)
                         q.append(t)
         return seen

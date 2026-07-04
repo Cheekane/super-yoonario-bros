@@ -83,9 +83,14 @@ Every level is verified by `game/reach.py`, which models the jump physics
 (height, distance, ceilings) and proves the goal, checkpoints, power-ups
 and coins are reachable. `tests/smoke_test.py` fails if a level regresses.
 
-**Enemies:** Grubs (stomp them), Shellbacks (stomp, then kick the shell),
-Spinies (fireball only!), Flits (flying), Chomp Plants (in pipes), and
-King Snap, who takes more stomps in each world.
+**Enemies:** Grubs (stomp them), Dozers (smarter grubs that won't walk off
+ledges), Shellbacks (stomp, then kick the shell), Spinies (fireball only!),
+Flits (flying — and they dive at you), Hoppers (frogs that leap at the
+nearest player), Chomp Plants (in pipes), turret blocks that fire stompable
+cannonballs, and King Snap, who takes more stomps in each world.
+
+**Obstacles:** spikes, lava, moving platforms, rotating firebars (castles),
+and springboards that launch you to high ledges and secrets.
 
 Levels are plain ASCII maps in `game/levels.py` — open it and you can read
 (or edit!) every level like a picture. The legend is at the top of the file.

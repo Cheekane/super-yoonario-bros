@@ -206,6 +206,9 @@ class Audio:
         s["respawn"] = sound(square(lambda t: 200 + 600 * t, 0.2, 0.35))
         s["checkpoint"] = sound(jingle(["C6", "E6", "G6"], 0.07, 0.45))
         s["throw"] = sound(square(lambda t: 500 - 800 * t, 0.10, 0.4))
+        s["spring"] = sound(square(lambda t: 150 + 1400 * t, 0.18, 0.5))
+        s["cannon"] = sound(mix(noise(0.15, 0.5, decay=1.0, low=True),
+                                square(lambda t: 90 - 150 * t, 0.12, 0.4)))
 
     def _build_music(self):
         b = 0.145  # beat length (s) ~ 103 bpm eighth notes

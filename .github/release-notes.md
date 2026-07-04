@@ -25,13 +25,15 @@ the rest pick Join Multiplayer and type it in.
 
 ## New in this version
 
-- **Game codes** — no more typing IP addresses
-- **Overworld map** — walk between levels, single player
-- **Lives** — 5 to start, 1-Ups and 100 coins add more, game over like the
-  classics (in co-op you spectate; if the whole team is out the level restarts)
-- **All 12 levels redesigned** — bigger, better paced, and every jump is now
-  machine-verified to be possible (including ceiling clearance)
-- Bosses wait in their arena instead of wandering off, pause menu fixed
+- **Crisp pixel font** — all text redrawn with a sharp bitmap font
+- **New character art** — cleaner sprites, and a properly drawn super form
+- **Smarter, more varied enemies** — Hoppers leap at you, Dozers won't fall
+  off ledges, Flits dive-bomb, turrets aim and fire cannonballs
+- **New obstacles** — rotating firebars in castles and springboards that
+  launch you to secrets
+- **Longer levels** — every level extended with new sections; all still
+  machine-verified beatable
+- Fixed the idle "wiggle" (players no longer animate while standing still)
 
 ## Controls
 

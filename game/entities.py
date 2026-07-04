@@ -9,7 +9,8 @@ from .constants import (
     STOMP_BOUNCE, STOMP_BOUNCE_HELD, SMALL_W, SMALL_H, BIG_W, BIG_H, HURT_INVULN,
     SPAWN_INVULN, CHARACTERS, GRUB_SPEED, SHELL_WALK_SPEED, SHELL_SLIDE_SPEED,
     SPINY_SPEED, FLIT_SPEED, FLIT_AMP, PLANT_PERIOD, FIREBALL_SPEED,
-    FIREBALL_BOUNCE, START_LIVES,
+    FIREBALL_BOUNCE, START_LIVES, HOPPER_JUMP, HOPPER_SPEED, HOPPER_WAIT,
+    DOZER_SPEED, CANNON_SPEED, SPRING_VEL,
 )
 
 
@@ -204,6 +205,13 @@ class Player(Entity):
         self.platform = res["on_platform"]
         if self.on_ground:
             self.jumping = False
+            # springboard: launch high (hold jump to go even higher)
+            under = level.tile(int(self.cx // TILE), int((self.y + self.h + 2) // TILE))
+            if under == "J":
+                self.vy = SPRING_VEL * self.stats["jump"]
+                self.jumping = False        # spring bounce can't be jump-cut
+                self.on_ground = False
+                world.sfx_local(self, "spring")
         if res["bumped"] and self.vy == 0:
             # pick the tile most aligned with player's center
             best = min(res["bumped"], key=lambda t: abs((t[0] + 0.5) * TILE - self.cx))
@@ -464,12 +472,26 @@ class Flit(Enemy):
         self.anchor_x = x
         self.anchor_y = y
         self.t = 0.0
+        self.dive = 0.0                     # 0..1 swoop toward players below
 
     def tick(self, level, dt, world):
         self.t += dt
+        target = world.nearest_player_pos(self.cx, self.y)
+        want = 0.0
+        if target and abs(target[0] - self.cx) < 56 and target[1] > self.y:
+            want = 1.0                      # player underneath: swoop down
+        self.dive += (want - self.dive) * min(1.0, 2.5 * dt)
         self.x = self.anchor_x + math.sin(self.t * 0.9) * 40
-        self.y = self.anchor_y + math.sin(self.t * 2.2) * FLIT_AMP
+        self.y = self.anchor_y + math.sin(self.t * 2.2) * FLIT_AMP \
+            + self.dive * 44
         self.dir = 1 if math.cos(self.t * 0.9) > 0 else -1
+
+    def extra(self):
+        return round(self.dive, 2)
+
+    def set_extra(self, extra):
+        if isinstance(extra, (int, float)):
+            self.dive = extra
 
 
 class Plant(Enemy):
@@ -507,6 +529,82 @@ class Plant(Enemy):
         self.out = extra
         self.y = self.base_y - 18 * self.out + 2
         self.h = max(2, int(18 * self.out))
+
+
+class Dozer(Walker):
+    """Smart walker: turns at ledges instead of marching off them."""
+    kind = "dozer"
+    speed = DOZER_SPEED
+
+    def __init__(self, eid, x, y):
+        super().__init__(eid, x, y, 13, 11)
+
+    def tick(self, level, dt, world):
+        if self.vy == 0:                    # grounded: probe the ledge ahead
+            front = self.cx + (self.w / 2 + 2) * self.dir
+            ftx = int(front // TILE)
+            fty = int((self.y + self.h + 4) // TILE)
+            if not level.is_solid(ftx, fty) and not level.is_oneway(ftx, fty):
+                self.dir *= -1
+        super().tick(level, dt, world)
+
+
+class Hopper(Enemy):
+    """Frog that waits, then leaps toward the nearest player."""
+    kind = "hopper"
+
+    def __init__(self, eid, x, y):
+        super().__init__(eid, x, y, 13, 12)
+        self.wait = HOPPER_WAIT * (1 + (eid % 3) * 0.3)
+        self.grounded = True
+
+    def tick(self, level, dt, world):
+        if self.grounded:
+            self.vx = 0
+            self.wait -= dt
+            if self.wait <= 0:
+                target = world.nearest_player_x(self.cx)
+                if target is not None:
+                    self.dir = 1 if target > self.cx else -1
+                self.vy = HOPPER_JUMP
+                self.vx = HOPPER_SPEED * self.dir
+                self.grounded = False
+                self.wait = HOPPER_WAIT
+        self.vy = min(self.vy + GRAVITY * dt, MAX_FALL)
+        res = move_collide(self, level, dt, oneway=True)
+        if res["hit_wall"]:
+            self.dir *= -1
+            self.vx = HOPPER_SPEED * self.dir
+        if res["on_ground"] and not self.grounded and self.vy >= 0:
+            self.grounded = True
+        if self.y > level.pixel_h + 64:
+            self.alive = False
+
+    def extra(self):
+        return int(self.grounded)
+
+    def set_extra(self, extra):
+        if isinstance(extra, int):
+            self.grounded = bool(extra)
+
+
+class CannonBall(Enemy):
+    """Slow projectile fired by turret blocks; stompable in mid-air."""
+    kind = "cball"
+
+    def __init__(self, eid, x, y):
+        super().__init__(eid, x, y, 10, 7)
+        self.life = 9.0
+
+    def tick(self, level, dt, world):
+        self.life -= dt
+        self.x += CANNON_SPEED * self.dir * dt
+        if self.life <= 0 or self.x < -32 or self.x > level.pixel_w + 32:
+            self.alive = False
+
+    def stomp(self, world):
+        self.squash_t = 0.25
+        return True
 
 
 class Boss(Enemy):
@@ -586,7 +684,8 @@ class Boss(Enemy):
 
 
 ENEMY_CLASSES = {"grub": Grub, "shell": Shell, "spiny": Spiny,
-                 "flit": Flit, "plant": Plant, "boss": Boss}
+                 "flit": Flit, "plant": Plant, "boss": Boss,
+                 "dozer": Dozer, "hopper": Hopper, "cball": CannonBall}
 
 
 def make_enemy(kind, eid, tx, ty, boss_hp=3):

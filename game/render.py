@@ -3,7 +3,8 @@ import pygame
 
 from .constants import TILE, VIEW_W, VIEW_H, CHARACTERS
 from .sprites import THEMES
-from .entities import Shell, Boss, Plant, Grub, Spiny, Flit
+from .entities import (Shell, Boss, Plant, Grub, Spiny, Flit, Hopper,
+                        Dozer, CannonBall)
 
 
 _bg_cache = {}
@@ -70,6 +71,13 @@ def draw_world(surf, world, sprites):
     for e in world.enemies:
         draw_enemy(surf, e, sprites, cx, cy, world.t)
 
+    for tx, ty in world.level.firebars:
+        px, py = tx * TILE + 8 - cx, ty * TILE + 8 - cy
+        if -80 < px < VIEW_W + 80:
+            pygame.draw.circle(surf, (120, 120, 128), (px, py), 3)
+            for fx, fy in world.firebar_points(tx, ty):
+                surf.blit(sprites.fireball, (int(fx) - 4 - cx, int(fy) - 3 - cy))
+
     for sb in world.spikeballs:
         surf.blit(sprites.spike_ball, (int(sb.x) - cx, int(sb.y) - cy))
 
@@ -89,8 +97,15 @@ def draw_world(surf, world, sprites):
 def draw_enemy(surf, e, sprites, cx, cy, t):
     f = int(e.anim_t * 5) % 2
     r = e.rect
-    if isinstance(e, Grub):
+    if isinstance(e, (Grub, Dozer)):
         img = sprites.grub_squash if e.squash_t > 0 else sprites.grub[f]
+    elif isinstance(e, Hopper):
+        img = sprites.hopper[0 if e.grounded and e.squash_t <= 0 else 1]
+    elif isinstance(e, CannonBall):
+        img = sprites.cannonball
+        surf.blit(pygame.transform.flip(img, e.dir > 0, e.flip_dead or e.squash_t > 0),
+                  (r.centerx - 5 - cx, r.centery - 3 - cy))
+        return
     elif isinstance(e, Shell):
         img = sprites.shell if e.state != "walk" else sprites.shell_walk[f]
         if e.state == "slide":

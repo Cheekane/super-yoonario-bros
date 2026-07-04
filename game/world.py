@@ -16,8 +16,10 @@ from .constants import (
     TILE, VIEW_W, VIEW_H, STOMP_BOUNCE, STOMP_BOUNCE_HELD, RESPAWN_DELAY,
     SPAWN_INVULN, SCORE_COIN, SCORE_STOMP, SCORE_FIREBALL_KILL, SCORE_POWERUP,
     SCORE_1UP, SCORE_FLAG_BASE, SCORE_BOSS, LEVEL_TIME, SCORE_KICK,
-    COINS_PER_LIFE,
+    COINS_PER_LIFE, CANNON_COOLDOWN, CANNON_RANGE, FIREBAR_SPEED,
+    FIREBAR_FLAMES,
 )
+import math as _math
 from .level import Level
 from .entities import (
     Player, Coin, Fireball, SpikeBall, Particle, Shell, Boss, Plant, Spiny,
@@ -70,6 +72,7 @@ class World:
         self._next_eid = 0
         self._next_iid = 0
         self._next_fid = 0
+        self._turret_cd = {t: CANNON_COOLDOWN * 0.5 for t in self.level.turrets}
         self._populate()
 
     # ---------------------------------------------------------------- setup
@@ -153,10 +156,14 @@ class World:
                     e.update(self.level, dt, self)
             self.enemies = [e for e in self.enemies if e.alive]
 
+        if self.authority and not self.cleared:
+            self.update_turrets(dt)
+
         if me and not me.dead and not self.cleared:
             self.player_enemy_collisions(me)
             self.player_item_collisions(me)
             self.check_flag(me)
+            self.firebar_collisions(me)
 
         self.particles = [p for p in self.particles if p.update(dt)]
         if self.cleared:
@@ -459,6 +466,53 @@ class World:
             if r.colliderect(e.rect):
                 e.fire_kill(self)
                 self.sfx_at(e, "kick")
+
+    def update_turrets(self, dt):
+        for (tx, ty), cd in list(self._turret_cd.items()):
+            cd -= dt
+            if cd <= 0:
+                cx, cy = tx * TILE + 8, ty * TILE + 6
+                target = self.nearest_player_x(cx)
+                if target is not None and 24 < abs(target - cx) < CANNON_RANGE:
+                    d = 1 if target > cx else -1
+                    self._next_eid += 1
+                    from .entities import CannonBall
+                    ball = CannonBall(self._next_eid, cx + d * 12, cy)
+                    ball.dir = d
+                    self.enemies.append(ball)
+                    self.sfx_at(ball, "cannon")
+                    cd = CANNON_COOLDOWN
+            self._turret_cd[(tx, ty)] = cd
+
+    def firebar_points(self, tx, ty):
+        """Flame positions for the bar at (tx,ty) — pure function of world
+        time, so host and clients always agree with zero network traffic."""
+        cx, cy = tx * TILE + 8, ty * TILE + 8
+        ang = self.t * FIREBAR_SPEED + (tx * 0.7 + ty * 1.3)
+        return [(cx + _math.cos(ang) * (8 + i * 8),
+                 cy + _math.sin(ang) * (8 + i * 8))
+                for i in range(FIREBAR_FLAMES)]
+
+    def firebar_collisions(self, p):
+        if p.invuln > 0:
+            return
+        r = p.rect.inflate(2, 2)
+        for tx, ty in self.level.firebars:
+            if abs(tx * TILE - p.cx) > 80:
+                continue
+            for fx, fy in self.firebar_points(tx, ty):
+                if r.collidepoint(fx, fy):
+                    p.damage(self)
+                    return
+
+    def nearest_player_pos(self, x, y):
+        best, dist = None, 1e9
+        for p in self.players.values():
+            if not p.dead:
+                d = abs(p.cx - x) + abs(p.y - y)
+                if d < dist:
+                    best, dist = (p.cx, p.y), d
+        return best
 
     def nearest_player_x(self, x):
         best, dist = None, 1e9
