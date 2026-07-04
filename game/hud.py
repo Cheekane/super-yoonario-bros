@@ -39,10 +39,14 @@ def draw_hud(surf, world, net_info=None, sprites=None):
     text(surf, f"{me.name}", 6, 4, CHAR_COLORS[CHARACTERS[me.char]['color']][1], 8)
     text(surf, f"SCORE {me.score:06d}", 6, 14, (255, 255, 255), 8)
     if sprites:
-        surf.blit(sprites.coin[0], (108, 11))
-        text(surf, f"x{me.coins:02d}", 122, 14, (255, 224, 88), 8)
+        surf.blit(sprites.coin[0], (92, 11))
+        text(surf, f"x{me.coins:02d}", 106, 14, (255, 224, 88), 8)
+        icon = sprites.heroes[(CHARACTERS[me.char]["color"], False)]["small"][0]
+        surf.blit(pygame.transform.scale(icon, (12, 12)), (136, 12))
+        text(surf, f"x{me.lives}", 150, 14, (255, 255, 255), 8)
     else:
-        text(surf, f"x{me.coins:02d}", 110, 14, (255, 224, 88), 8)
+        text(surf, f"coins x{me.coins:02d}  lives x{me.lives}", 92, 14,
+             (255, 224, 88), 8)
     text(surf, f"{lv['world']}-{lv['index']} {lv['name']}", VIEW_W // 2, 4,
          (255, 255, 255), 8, center=True)
     text(surf, f"TIME {int(world.time_left):03d}", VIEW_W - 64, 4, (255, 255, 255), 8)
@@ -59,8 +63,12 @@ def draw_hud(surf, world, net_info=None, sprites=None):
         y += 8
 
     if me.dead:
-        text(surf, "Respawning...", VIEW_W // 2, VIEW_H // 2 - 20,
-             (255, 120, 120), 10, center=True)
+        if world.spectating(me):
+            text(surf, "Out of lives - spectating", VIEW_W // 2,
+                 VIEW_H // 2 - 20, (255, 120, 120), 10, center=True)
+        else:
+            text(surf, "Respawning...", VIEW_W // 2, VIEW_H // 2 - 20,
+                 (255, 120, 120), 10, center=True)
 
     if world.cleared:
         box(surf, VIEW_W // 2 - 70, VIEW_H // 2 - 26, 140, 44)

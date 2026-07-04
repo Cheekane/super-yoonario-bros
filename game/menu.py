@@ -3,7 +3,9 @@ import time
 
 import pygame
 
-from .constants import VIEW_W, VIEW_H, CHARACTERS, MAX_PLAYERS, NET_PORT
+from .constants import VIEW_W, VIEW_H, CHARACTERS, MAX_PLAYERS, NET_PORT, \
+    START_LIVES
+from .code import encode_addr, parse_join_target
 from .sprites import CHAR_COLORS, THEMES
 from .levels import LEVELS
 from .hud import text, box
@@ -51,6 +53,8 @@ class TitleScene(Scene):
     def __init__(self, app):
         super().__init__(app)
         self.index = 0
+        app.session_lives = START_LIVES
+        app.session_coins = 0
         app.audio.play_music("menu")
 
     def update(self, dt, events):
@@ -119,7 +123,8 @@ class CharSelectScene(Scene):
         self.app.save.write()
         self.app.audio.play("confirm")
         if self.mode == "sp":
-            self.app.switch(LevelSelectScene(self.app))
+            from .mapscene import MapScene
+            self.app.switch(MapScene(self.app))
         elif self.mode == "host":
             self.app.switch(HostLobbyScene(self.app))
         else:
@@ -151,45 +156,6 @@ class CharSelectScene(Scene):
              VIEW_W // 2, VIEW_H - 36, (220, 220, 240), 8, center=True)
 
 
-class LevelSelectScene(Scene):
-    def __init__(self, app):
-        super().__init__(app)
-        self.index = min(app.save["unlocked"], len(LEVELS)) - 1
-        app.audio.play_music("menu")
-
-    def update(self, dt, events):
-        unlocked = self.app.save["unlocked"]
-        self.index, ok, back = menu_nav(events, self.index, unlocked)
-        if ok:
-            self.app.audio.play("confirm")
-            from .app import GameScene
-            self.app.switch(GameScene(self.app, "sp", self.index))
-        if back:
-            self.app.switch(TitleScene(self.app))
-
-    def draw(self, surf):
-        draw_sky(surf, self.app)
-        text(surf, "SELECT LEVEL", VIEW_W // 2, 12, (255, 255, 255), 12, center=True)
-        unlocked = self.app.save["unlocked"]
-        top = max(0, self.index - 5)
-        for row, i in enumerate(range(top, min(len(LEVELS), top + 8))):
-            lv = LEVELS[i]
-            y = 34 + row * 20
-            locked = i >= unlocked
-            sel = i == self.index
-            col = (120, 120, 130) if locked else \
-                (255, 224, 88) if sel else (255, 255, 255)
-            label = f"{lv['world']}-{lv['index']} {lv['name']}"
-            if locked:
-                label += "  [locked]"
-            text(surf, ("> " if sel else "  ") + label, 40, y, col, 9)
-            best = self.app.save["best"].get(str(i))
-            if best and not locked:
-                text(surf, f"best {best['score']}", 230, y, (160, 255, 160), 7)
-        text(surf, "enter: play   esc: back", VIEW_W // 2, VIEW_H - 22,
-             (220, 220, 240), 8, center=True)
-
-
 class JoinScene(Scene):
     def __init__(self, app):
         super().__init__(app)
@@ -212,9 +178,9 @@ class JoinScene(Scene):
                     self.ip = self.ip[:-1]
                 elif e.key == pygame.K_RETURN and self.ip.strip():
                     self._connect()
-                elif e.unicode and (e.unicode.isdigit() or e.unicode in ".:"):
+                elif e.unicode and (e.unicode.isalnum() or e.unicode in ".:-"):
                     if len(self.ip) < 21:
-                        self.ip += e.unicode
+                        self.ip += e.unicode.upper()
         if self.client:
             for msg in self.client.poll():
                 if msg["t"] == "welcome":
@@ -236,15 +202,11 @@ class JoinScene(Scene):
                     self.client = None
 
     def _connect(self):
-        ip = self.ip.strip()
-        port = NET_PORT
-        if ":" in ip:
-            ip, _, p = ip.partition(":")
-            port = int(p) if p.isdigit() else NET_PORT
         try:
+            ip, port = parse_join_target(self.ip)
             self.client = net.Client(ip, port)
-        except OSError:
-            self.status = "Invalid address."
+        except (ValueError, OSError) as exc:
+            self.status = f"Invalid code: {exc}"
             return
         self.client.join(self.app.save["player_name"], self.app.save["character"])
         self.join_sent = time.time()
@@ -253,15 +215,16 @@ class JoinScene(Scene):
     def draw(self, surf):
         draw_sky(surf, self.app)
         text(surf, "JOIN GAME", VIEW_W // 2, 30, (255, 255, 255), 14, center=True)
-        text(surf, "Host address:", VIEW_W // 2, 80, (255, 255, 255), 9, center=True)
+        text(surf, "Game code (or address):", VIEW_W // 2, 80, (255, 255, 255),
+             9, center=True)
         box(surf, VIEW_W // 2 - 80, 96, 160, 18)
         text(surf, self.ip + ("_" if not self.client else ""), VIEW_W // 2, 100,
              (255, 224, 88), 10, center=True)
         if self.status:
             text(surf, self.status, VIEW_W // 2, 130, (255, 160, 160), 8, center=True)
-        text(surf, "same wifi: use the host's LAN IP shown on their screen",
+        text(surf, "type the code from the host's lobby screen",
              VIEW_W // 2, VIEW_H - 52, (220, 220, 240), 8, center=True)
-        text(surf, "over internet: host forwards UDP port, or use Tailscale",
+        text(surf, "wifi code for same network, internet code otherwise",
              VIEW_W // 2, VIEW_H - 40, (220, 220, 240), 8, center=True)
         text(surf, "enter: connect   esc: back", VIEW_W // 2, VIEW_H - 24,
              (220, 220, 240), 8, center=True)
@@ -341,15 +304,18 @@ class HostLobbyScene(Scene):
                  center=True)
             return
         text(surf, "HOSTING GAME", VIEW_W // 2, 10, (255, 255, 255), 12, center=True)
-        text(surf, f"Same wifi: {self.ip}:{self.host.port}", VIEW_W // 2, 26,
-             (160, 255, 160), 8, center=True)
+        try:
+            wifi = f"Wifi code: {encode_addr(self.ip, self.host.port)}"
+        except ValueError:
+            wifi = f"Wifi: {self.ip}:{self.host.port}"
+        text(surf, wifi, VIEW_W // 2, 26, (160, 255, 160), 8, center=True)
         up = self.host.upnp
         if up is None or up.status == "working":
             text(surf, "Internet: checking your router...", VIEW_W // 2, 37,
                  (200, 200, 220), 8, center=True)
         elif up.status == "ok":
-            text(surf, f"Internet: {up.external_ip}:{self.host.port}",
-                 VIEW_W // 2, 37, (160, 255, 160), 8, center=True)
+            text(surf, f"Internet code: {encode_addr(up.external_ip, self.host.port)}",
+                 VIEW_W // 2, 37, (255, 224, 88), 8, center=True)
         else:
             text(surf, f"Internet: {up.message} - R to retry",
                  VIEW_W // 2, 37, (255, 190, 120), 7, center=True)

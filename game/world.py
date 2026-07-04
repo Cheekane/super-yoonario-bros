@@ -16,6 +16,7 @@ from .constants import (
     TILE, VIEW_W, VIEW_H, STOMP_BOUNCE, STOMP_BOUNCE_HELD, RESPAWN_DELAY,
     SPAWN_INVULN, SCORE_COIN, SCORE_STOMP, SCORE_FIREBALL_KILL, SCORE_POWERUP,
     SCORE_1UP, SCORE_FLAG_BASE, SCORE_BOSS, LEVEL_TIME, SCORE_KICK,
+    COINS_PER_LIFE,
 )
 from .level import Level
 from .entities import (
@@ -123,7 +124,8 @@ class World:
                 self.player_world_collisions(me)
             else:
                 me.respawn_t += dt
-                if me.respawn_t > RESPAWN_DELAY and not self.cleared:
+                if me.respawn_t > RESPAWN_DELAY and not self.cleared \
+                        and me.lives > 0:
                     self.respawn(me)
             for fb in self.fireballs:
                 fb.update(self.level, dt, self)
@@ -160,7 +162,25 @@ class World:
         if self.cleared:
             self.clear_t += dt
         if me:
-            self.camera.follow(me, dt)
+            target = me
+            if self.spectating(me):         # out of lives: watch a teammate
+                for p in self.players.values():
+                    if not p.dead:
+                        target = p
+                        break
+            self.camera.follow(target, dt)
+
+    def spectating(self, p):
+        return p.dead and p.lives <= 0
+
+    def local_out(self):
+        """Local player is out of lives (past the respawn grace)."""
+        me = self.local_player
+        return bool(me and self.spectating(me) and me.respawn_t > RESPAWN_DELAY)
+
+    def all_out(self):
+        """Every player in the session is out of lives."""
+        return all(self.spectating(p) for p in self.players.values())
 
     # ------------------------------------------------------- player collisions
 
@@ -254,6 +274,7 @@ class World:
             self.audio.play("powerup")
             p.score += SCORE_POWERUP
         elif itype == "oneup":
+            p.lives += 1
             self.audio.play("oneup")
             p.score += SCORE_1UP
         self.add_score_pop(p.cx, p.y, SCORE_POWERUP)
@@ -359,6 +380,7 @@ class World:
                 self.level.grid[ty][tx] = "#"
                 self.audio.play("coin" if code == "?" else "sprout")
                 if code == "?":
+                    self.add_coin(player)
                     self.add_coin_pop(tx, ty, player)
             self.outbox.append({"t": "bump", "tx": tx, "ty": ty})
         self.bounce_enemies_above(tx, ty)
@@ -377,8 +399,7 @@ class World:
         elif code == "?":
             self.level.set_tile(tx, ty, "#")
             self.audio.play("coin")
-            player.score += SCORE_COIN
-            player.coins += 1
+            self.add_coin(player)
             self.add_coin_pop(tx, ty, player)
             self.broadcast_event("coinpop", {"tx": tx, "ty": ty, "pid": player.pid})
         elif code in "MU":
@@ -402,12 +423,20 @@ class World:
             if e.alive and e.rect.colliderect(zone):
                 e.fire_kill(self)
 
+    def add_coin(self, p):
+        p.coins += 1
+        p.score += SCORE_COIN
+        if p.coins >= COINS_PER_LIFE:
+            p.coins -= COINS_PER_LIFE
+            p.lives += 1
+            self.audio.play("oneup")
+            self.add_score_pop(p.cx, p.y - 8, "1UP")
+
     def collect_coin(self, p, cid):
         if cid not in self.coins:
             return
         del self.coins[cid]
-        p.coins += 1
-        p.score += SCORE_COIN
+        self.add_coin(p)
         self.audio.play("coin")
         if not self.authority:
             self.outbox.append({"t": "coin", "cid": list(cid)})
@@ -497,6 +526,7 @@ class World:
     def add_score_pop(self, x, y, score):
         self.particles.append(Particle(x, y - 8, 0, -30, "score",
                                        str(score), life=0.8))
+
 
     # ============================== NETWORKING ==============================
 

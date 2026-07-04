@@ -61,7 +61,11 @@ SCORE_POWERUP = 1000
 SCORE_1UP = 2000
 SCORE_FLAG_BASE = 2000
 SCORE_BOSS = 5000
-LEVEL_TIME = 300                   # countdown; grants bonus score, never kills
+LEVEL_TIME = 400                   # countdown; grants bonus score, never kills
+
+# --- Lives ---
+START_LIVES = 5
+COINS_PER_LIFE = 100
 
 # --- Networking ---
 NET_PORT = 26501
@@ -70,4 +74,4 @@ PSTATE_RATE = 30                   # client player-state send Hz
 INTERP_DELAY = 0.1                 # seconds of interpolation buffer
 NET_TIMEOUT = 6.0                  # drop peer after silence
 MAX_PLAYERS = 4
-PROTOCOL_VERSION = 1
+PROTOCOL_VERSION = 2

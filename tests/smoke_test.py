@@ -126,6 +126,43 @@ if hw.enemies:
 client.close()
 host.close()
 
+# 5b. Level reachability: every goal/checkpoint/block/coin provably reachable
+from game.reach import validate_all
+reach_problems = validate_all()
+for name, plist in reach_problems.items():
+    for p in plist:
+        print(f"   {name}: {p}")
+check("levels reachable", not reach_problems)
+
+# 5c. Game codes: address <-> code roundtrip
+from game.code import encode_addr, decode_code, parse_join_target
+for ip, port in (("99.242.69.229", 26501), ("10.0.0.171", 26501),
+                 ("192.168.1.23", 31000)):
+    code_s = encode_addr(ip, port)
+    check(f"code roundtrip {ip}:{port}",
+          decode_code(code_s) == (ip, port), code_s)
+check("code tolerates lookalikes",
+      parse_join_target(encode_addr("10.0.0.171").lower().replace("0", "O"))
+      == ("10.0.0.171", 26501))
+check("raw ip still accepted", parse_join_target("10.0.0.9:26501") == ("10.0.0.9", 26501))
+
+# 5d. Lives: death decrements, 100 coins grants one, no respawn at zero
+lw = World(0, audio, sprites, authority=True)
+lp = lw.add_player(0, 0, "L", local=True)
+start_lives = lp.lives
+lp.invuln = 0
+lp.kill(lw)
+check("death costs a life", lp.lives == start_lives - 1)
+lp.coins = 99
+lw.add_coin(lp)
+check("100 coins = 1-up", lp.lives == start_lives and lp.coins == 0)
+lp.lives = 0
+lp.dead = True
+lp.respawn_t = 99
+for _ in range(60):
+    lw.update(1 / 60, {})
+check("no respawn at zero lives", lp.dead and lw.spectating(lp))
+
 # 6. UPnP parsing (offline: fixture XML, no real router involved)
 from game import upnp
 

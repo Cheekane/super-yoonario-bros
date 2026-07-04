@@ -10,6 +10,7 @@ DEFAULT = {
     "best": {},                  # level_id(str) -> {"score": int, "coins": int}
     "player_name": "Player",
     "character": 0,
+    "map_pos": 0,
     "sfx_volume": 0.8,
     "music_volume": 0.5,
     "last_host_ip": "",

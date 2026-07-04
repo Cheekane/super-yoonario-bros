@@ -4,7 +4,7 @@ import time
 import pygame
 
 from .constants import (
-    VIEW_W, VIEW_H, FPS, DT, SNAP_RATE, PSTATE_RATE, INTERP_DELAY,
+    VIEW_W, VIEW_H, FPS, DT, SNAP_RATE, PSTATE_RATE, INTERP_DELAY, START_LIVES,
 )
 from .levels import LEVELS
 from .sprites import Sprites
@@ -22,22 +22,26 @@ RUN_KEYS = (pygame.K_x, pygame.K_LSHIFT, pygame.K_RSHIFT)
 
 class GameScene(Scene):
     def __init__(self, app, role, level_id, host=None, client=None,
-                 first_snap=None):
+                 first_snap=None, run=0):
         super().__init__(app)
         self.role = role                    # sp | host | client
         self.level_id = level_id
+        self.run = run                      # restart counter (multiplayer)
         self.host = host
         self.client = client
         self.world = World(level_id, app.audio, app.sprites,
                            authority=(role != "client"))
         pid = client.pid if role == "client" else 0
-        self.world.add_player(pid, app.save["character"],
-                              app.save["player_name"], local=True)
+        me = self.world.add_player(pid, app.save["character"],
+                                   app.save["player_name"], local=True)
+        me.lives = app.session_lives
+        me.coins = app.session_coins
         if first_snap:
             self.world.apply_snapshot(first_snap, time.time())
         self.paused = False
         self.pause_index = 0
         self.ready_t = 1.2                  # "READY?" banner time
+        self.gameover_t = 0.0
         self._send_t = 0.0
         self._recorded = False
         app.audio.play_music(LEVELS[level_id]["music"])
@@ -60,8 +64,9 @@ class GameScene(Scene):
                     inp["jump_pressed"] = True
                 elif e.key in RUN_KEYS and not self.paused:
                     inp["fire_pressed"] = True
-                elif e.key in (pygame.K_ESCAPE, pygame.K_RETURN):
-                    self.paused = not self.paused
+                elif e.key in (pygame.K_ESCAPE, pygame.K_RETURN) \
+                        and not self.paused:
+                    self.paused = True
                     self.pause_index = 0
                     self.app.audio.play("pause")
                 elif e.key == pygame.K_MINUS:
@@ -93,6 +98,8 @@ class GameScene(Scene):
             if self._client_net():
                 return
 
+        if self._update_lives_flow(dt):
+            return
         if self.world.cleared and not self._recorded:
             self._recorded = True
             me = self.world.local_player
@@ -102,8 +109,32 @@ class GameScene(Scene):
         if self.world.cleared and self.world.clear_t > 4.5:
             self._advance()
 
+    def _update_lives_flow(self, dt):
+        """Game over (sp) / restart-when-all-out (host). True if scene switched."""
+        w = self.world
+        if w.cleared:
+            return False
+        if self.role == "sp" and w.local_out():
+            self.gameover_t += dt
+            if self.gameover_t > 3.5:
+                self.app.session_lives = START_LIVES
+                self.app.session_coins = 0
+                self.app.audio.stop_music()
+                from .mapscene import MapScene
+                self.app.switch(MapScene(self.app, focus=self.level_id))
+                return True
+        elif self.role == "host" and w.players and w.all_out():
+            self.gameover_t += dt
+            if self.gameover_t > 3.0:
+                self.app.session_lives = START_LIVES
+                self.app.session_coins = 0
+                self.app.switch(GameScene(self.app, "host", self.level_id,
+                                          host=self.host, run=self.run + 1))
+                return True
+        return False
+
     def _update_pause(self, events):
-        opts = ["Resume", "Restart Level", "Quit to Title"] if self.role == "sp" \
+        opts = ["Resume", "Restart Level", "Quit to Map"] if self.role == "sp" \
             else ["Resume", "Leave Game"]
         self.pause_index, ok, back = menu_nav(events, self.pause_index, len(opts))
         if back:
@@ -115,6 +146,11 @@ class GameScene(Scene):
             self.paused = False
         elif choice == "Restart Level":
             self.app.switch(GameScene(self.app, "sp", self.level_id))
+            return True
+        elif choice == "Quit to Map":
+            self.app.audio.stop_music()
+            from .mapscene import MapScene
+            self.app.switch(MapScene(self.app, focus=self.level_id))
             return True
         else:
             self._leave()
@@ -130,12 +166,19 @@ class GameScene(Scene):
         self.app.switch(TitleScene(self.app))
 
     def _advance(self):
+        me = self.world.local_player
+        if me:
+            self.app.session_lives = me.lives
+            self.app.session_coins = me.coins
         nxt = self.level_id + 1
         if self.role == "sp":
             if nxt >= len(LEVELS):
                 self.app.switch(VictoryScene(self.app))
             else:
-                self.app.switch(GameScene(self.app, "sp", nxt))
+                self.app.save["map_pos"] = nxt
+                self.app.save.write()
+                from .mapscene import MapScene
+                self.app.switch(MapScene(self.app, focus=nxt))
         elif self.role == "host":
             if nxt >= len(LEVELS):
                 from .menu import HostLobbyScene
@@ -167,6 +210,7 @@ class GameScene(Scene):
             self._send_t = now
             snap = w.snapshot()
             snap["lv"] = self.level_id
+            snap["run"] = self.run
             self.host.send_all(snap)
 
     def _client_net(self):
@@ -176,9 +220,19 @@ class GameScene(Scene):
         for msg in self.client.poll():
             t = msg.get("t")
             if t == "snap":
-                if msg["lv"] != self.level_id:
+                run = msg.get("run", 0)
+                if msg["lv"] != self.level_id or run != self.run:
+                    if msg["lv"] == self.level_id:      # level was restarted
+                        self.app.session_lives = START_LIVES
+                        self.app.session_coins = 0
+                    else:
+                        me = w.local_player
+                        if me:
+                            self.app.session_lives = me.lives
+                            self.app.session_coins = me.coins
                     self.app.switch(GameScene(self.app, "client", msg["lv"],
-                                              client=self.client, first_snap=msg))
+                                              client=self.client,
+                                              first_snap=msg, run=run))
                     return True
                 w.apply_snapshot(msg, now)
             elif t == "lobby":
@@ -215,6 +269,15 @@ class GameScene(Scene):
         if self.ready_t > 0:
             text(surf, "READY?", VIEW_W // 2, VIEW_H // 2 - 30,
                  (255, 224, 88), 16, center=True)
+        if self.gameover_t > 0:
+            box(surf, VIEW_W // 2 - 70, VIEW_H // 2 - 20, 140, 40)
+            label = "GAME OVER" if self.role == "sp" else "EVERYONE'S OUT!"
+            text(surf, label, VIEW_W // 2, VIEW_H // 2 - 12,
+                 (255, 100, 100), 14, center=True)
+            sub = "back to the map..." if self.role == "sp" \
+                else "restarting level..."
+            text(surf, sub, VIEW_W // 2, VIEW_H // 2 + 6, (255, 255, 255), 8,
+                 center=True)
         if self.paused:
             box(surf, VIEW_W // 2 - 60, 80, 120, 80)
             text(surf, "PAUSED", VIEW_W // 2, 88, (255, 255, 255), 12, center=True)
@@ -267,6 +330,8 @@ class App:
         self.surface = self.screen
         self.clock = pygame.time.Clock()
         self.save = Save()
+        self.session_lives = START_LIVES
+        self.session_coins = 0
         self.audio = Audio()
         self.audio.sfx_volume = self.save["sfx_volume"]
         self.audio.music_volume = self.save["music_volume"]

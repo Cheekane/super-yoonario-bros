@@ -13,7 +13,8 @@ pygame.display.set_mode((320, 240))
 
 from game.constants import DT, VIEW_W, VIEW_H
 from game.app import App, GameScene
-from game.menu import TitleScene, CharSelectScene, LevelSelectScene, HostLobbyScene
+from game.menu import TitleScene, CharSelectScene, HostLobbyScene
+from game.mapscene import MapScene
 
 OUT = os.path.join(os.path.dirname(__file__), "shots")
 os.makedirs(OUT, exist_ok=True)
@@ -43,7 +44,8 @@ def shot(scene, name, frames=1, inp=None):
 shot(TitleScene(app), "01_title")
 shot(CharSelectScene(app, "sp"), "02_charselect")
 app.save["unlocked"] = 12
-shot(LevelSelectScene(app), "03_levelselect")
+app.session_lives = 5
+shot(MapScene(app), "03_overworld")
 
 for lid, tag in ((0, "04_level_1_1"), (3, "05_castle_boss"),
                  (4, "06_desert"), (8, "07_ice"), (2, "08_athletic")):

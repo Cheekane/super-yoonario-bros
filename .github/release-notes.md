@@ -13,16 +13,25 @@
 
 ## Playing together
 
-One player hosts (Host Multiplayer) and tells the others the address shown on
-their screen; the rest pick Join Multiplayer and type it in.
+One player hosts (Host Multiplayer) and reads out a short **game code**;
+the rest pick Join Multiplayer and type it in.
 
-- **Same wifi:** use the "Same wifi" address on the host's screen.
-- **Different homes:** use the "Internet" address — the game sets up the
-  router port forwarding automatically (UPnP) while you host. If the lobby
-  says auto-setup failed (UPnP off, or CGNAT internet), the host can forward
-  UDP port 26501 manually or everyone can use
-  [Tailscale](https://tailscale.com).
+- **Same wifi:** use the host's *Wifi code*.
+- **Different homes:** use the host's *Internet code* — the game sets up
+  router port forwarding automatically (UPnP) while hosting. If the lobby
+  says auto-setup failed, the host can forward UDP port 26501 manually or
+  everyone can use [Tailscale](https://tailscale.com).
 - Allow the app through the firewall if your OS asks (needed for hosting).
+
+## New in this version
+
+- **Game codes** — no more typing IP addresses
+- **Overworld map** — walk between levels, single player
+- **Lives** — 5 to start, 1-Ups and 100 coins add more, game over like the
+  classics (in co-op you spectate; if the whole team is out the level restarts)
+- **All 12 levels redesigned** — bigger, better paced, and every jump is now
+  machine-verified to be possible (including ceiling clearance)
+- Bosses wait in their arena instead of wandering off, pause menu fixed
 
 ## Controls
 

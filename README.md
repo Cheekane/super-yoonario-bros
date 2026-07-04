@@ -41,14 +41,16 @@ python3 -m venv .venv
 One player hosts, up to three join. Everyone picks a character in the lobby;
 the host picks the level and starts.
 
-The host's lobby screen shows two addresses:
+The host's lobby shows two **game codes** (short codes that encode the
+address — no IPs to dictate):
 
-- **Same wifi:** friends on the same network type the wifi address.
-- **Internet:** the game automatically forwards the port on the host's router
-  (UPnP) and shows the public address — friends anywhere type that one. The
-  mapping is removed when you stop hosting. If the router has UPnP disabled
-  or the ISP uses CGNAT, the lobby says so; fall back to forwarding UDP
-  `26501` manually or using [Tailscale](https://tailscale.com).
+- **Wifi code:** for friends on the same network.
+- **Internet code:** for friends anywhere — the game automatically forwards
+  the port on the host's router (UPnP) while hosting and removes the mapping
+  after. If the router has UPnP disabled or the ISP uses CGNAT, the lobby
+  says so; fall back to forwarding UDP `26501` manually or using
+  [Tailscale](https://tailscale.com). Raw `ip:port` still works on the Join
+  screen too.
 
 If someone dies they respawn after a couple of seconds next to a living
 teammate. The level is cleared when *any* player reaches the flag (or defeats
@@ -63,13 +65,23 @@ the boss). Players can drop in from the lobby and drop out at any time.
 - **Dash** — fastest on the ground, a little slippery
 - **Pip** — light and floaty, falls slowly
 
-**Worlds:** Green Hills (1-1 Rolling Meadow, 1-2 Dewdrop Cave, 1-3 Treetop
-Hop, 1-4 Snapjaw Keep), Sandy Dunes (Dune Dash, Oasis Pipes, Sky Ruins,
-Sunbaked Citadel), and Frostpeak (Slippery Slopes, Crystal Cavern, Blizzard
-Heights, King Snap's Fortress). Each world ends in a castle with a boss
+**Worlds:** an overworld map connects Green Hills (1-1 Rolling Meadow, 1-2
+Dewdrop Cave, 1-3 Treetop Hop, 1-4 Snapjaw Keep), Sandy Dunes (Dune Dash,
+Oasis Pipes, Sky Ruins, Sunbaked Citadel), and Frostpeak (Slippery Slopes,
+Crystal Cavern, Blizzard Heights, King Snap's Fortress) — walk between
+unlocked levels and press enter to play. Each world ends in a castle boss
 fight; world 3 has ice physics. Levels have mid-way checkpoints, ?-blocks
 with coins and power-ups (mushroom → fire flower), breakable bricks, moving
-platforms, and a coin/score system with a time bonus at the flag.
+platforms, and a time bonus at the flag.
+
+**Lives:** you start with 5. Deaths cost one; 1-Up blocks and every 100
+coins grant one. Out of lives in single player means game over (back to the
+map); in multiplayer you spectate until the team clears the level — and if
+the whole team is out, the level restarts for everyone.
+
+Every level is verified by `game/reach.py`, which models the jump physics
+(height, distance, ceilings) and proves the goal, checkpoints, power-ups
+and coins are reachable. `tests/smoke_test.py` fails if a level regresses.
 
 **Enemies:** Grubs (stomp them), Shellbacks (stomp, then kick the shell),
 Spinies (fireball only!), Flits (flying), Chomp Plants (in pipes), and

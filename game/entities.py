@@ -9,7 +9,7 @@ from .constants import (
     STOMP_BOUNCE, STOMP_BOUNCE_HELD, SMALL_W, SMALL_H, BIG_W, BIG_H, HURT_INVULN,
     SPAWN_INVULN, CHARACTERS, GRUB_SPEED, SHELL_WALK_SPEED, SHELL_SLIDE_SPEED,
     SPINY_SPEED, FLIT_SPEED, FLIT_AMP, PLANT_PERIOD, FIREBALL_SPEED,
-    FIREBALL_BOUNCE,
+    FIREBALL_BOUNCE, START_LIVES,
 )
 
 
@@ -122,6 +122,7 @@ class Player(Entity):
         self.local = True
         self.score = 0
         self.coins = 0
+        self.lives = START_LIVES
         self.checkpoint = None              # (x, y) respawn point
         self.finished = False
         self.platform = None
@@ -222,6 +223,7 @@ class Player(Entity):
     def kill(self, world):
         if self.dead:
             return
+        self.lives -= 1
         self.dead = True
         self.vy = -300.0
         self.vx = 0.0
@@ -236,7 +238,7 @@ class Player(Entity):
                 "vx": round(self.vx, 1), "f": self.facing, "form": self.form,
                 "d": int(self.dead), "i": int(self.invuln > 0),
                 "c": self.char, "n": self.name, "g": int(self.on_ground),
-                "sc": self.score, "co": self.coins}
+                "sc": self.score, "co": self.coins, "li": self.lives}
 
     def push_remote_state(self, t, st):
         self.net_buf.append((t, st))
@@ -279,6 +281,7 @@ class Player(Entity):
         self.on_ground = bool(st.get("g", 1))
         self.score = st.get("sc", self.score)
         self.coins = st.get("co", self.coins)
+        self.lives = st.get("li", self.lives)
         self.anim_t += 1 / 60 * (0.5 + abs(self.vx) / WALK_SPEED)
 
 
@@ -497,10 +500,13 @@ class Plant(Enemy):
 class Boss(Enemy):
     kind = "boss"
 
+    ACTIVATION_RANGE = 176                  # px; sleeps until a player is close
+
     def __init__(self, eid, x, y, hp):
         super().__init__(eid, x, y, 20, 17)
         self.hp = hp
         self.max_hp = hp
+        self.home_x, self.home_y = x, y     # arena anchor
         self.hurt_t = 0.0
         self.jump_t = 1.2
         self.throw_t = 2.5
@@ -511,22 +517,34 @@ class Boss(Enemy):
 
     def tick(self, level, dt, world):
         self.hurt_t = max(0.0, self.hurt_t - dt)
-        speed = 30 + 14 * (self.max_hp - self.hp)
         target = world.nearest_player_x(self.cx)
-        if target is not None:
+        active = target is not None and abs(target - self.cx) < self.ACTIVATION_RANGE
+        if active:
             self.dir = 1 if target > self.cx else -1
-        self.vx = speed * self.dir if self.hurt_t <= 0 else 0
-        self.jump_t -= dt
-        grounded_probe = self.vy == 0
-        if self.jump_t <= 0 and grounded_probe:
-            self.vy = -260.0
-            self.jump_t = 1.2 + (self.eid % 3) * 0.3
-        self.throw_t -= dt
-        if self.throw_t <= 0:
-            world.boss_throw(self)
-            self.throw_t = 2.8 - 0.4 * (self.max_hp - self.hp)
+            speed = 30 + 14 * (self.max_hp - self.hp)
+            self.vx = speed * self.dir if self.hurt_t <= 0 else 0
+            self.jump_t -= dt
+            if self.jump_t <= 0 and self.vy == 0:
+                self.vy = -260.0
+                self.jump_t = 1.2 + (self.eid % 3) * 0.3
+            self.throw_t -= dt
+            if self.throw_t <= 0:
+                world.boss_throw(self)
+                self.throw_t = 2.8 - 0.4 * (self.max_hp - self.hp)
+        else:
+            self.vx = 0                     # wait in the arena
+        # never walk off the arena ledge
+        if self.vy == 0 and self.vx != 0:
+            front = self.cx + (self.w / 2 + 3) * (1 if self.vx > 0 else -1)
+            if not level.is_solid(int(front // TILE),
+                                  int((self.y + self.h + 4) // TILE)):
+                self.vx = 0
         self.vy = min(self.vy + GRAVITY * dt, MAX_FALL)
         move_collide(self, level, dt, oneway=False)
+        # stay near home even if a jump drifts; recover if somehow dropped out
+        self.x = max(self.home_x - 84, min(self.x, self.home_x + 84))
+        if self.y > level.pixel_h:
+            self.x, self.y, self.vy = self.home_x, self.home_y, 0.0
 
     def stomp(self, world):
         if self.hurt_t > 0:
